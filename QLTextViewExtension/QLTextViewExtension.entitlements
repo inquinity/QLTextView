@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- Quick Look hands us the file; read-only access is sufficient. -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+    <!--
+      App Group is wired up now so Phase 2 (shared user-editable config)
+      needs no entitlement change. Replace the placeholder team-scoped id
+      to match the host app's group exactly.
+    -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.qltextview.shared</string>
+    </array>
+</dict>
+</plist>
