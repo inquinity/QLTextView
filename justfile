@@ -62,13 +62,19 @@ clean:
     rm -rf build
 
 # Build host app + embedded extension via xcodebuild (default: Release).
+# Signing is intentionally disabled here — `just sign` applies the
+# Developer ID signature + entitlements afterward (the "outside Xcode" flow).
 build:
     DEVELOPER_DIR={{xcode_dev}} \
       xcodebuild -project QLTextView.xcodeproj \
                  -target QLTextView \
                  -configuration {{config}} \
+                 CODE_SIGN_IDENTITY="" \
+                 CODE_SIGN_STYLE=Manual \
+                 CODE_SIGNING_REQUIRED=NO \
+                 CODE_SIGNING_ALLOWED=NO \
                  -quiet
-    @echo "✅ Built {{app}}"
+    @echo "✅ Built {{app}} (unsigned — run: just sign)"
 
 # Sign app + embedded appex with Developer ID, hardened runtime, secure timestamp.
 sign: _require-identity
