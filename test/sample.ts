@@ -1,0 +1,1 @@
+Sample typescript file

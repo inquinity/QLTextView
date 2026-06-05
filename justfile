@@ -21,6 +21,8 @@ app                := "build" / config / "QLTextView.app"
 appex              := app / "Contents/PlugIns/QLTextViewExtension.appex"
 app_entitlements   := "QLTextView/QLTextView.entitlements"
 appex_entitlements := "QLTextViewExtension/QLTextViewExtension.entitlements"
+pbxproj            := "QLTextView.xcodeproj/project.pbxproj"
+releases_dir       := "releases"
 
 # Default: show the recipe list.
 default: help
@@ -55,21 +57,62 @@ notary-check:
       && echo "✅ notary profile '{{notary_profile}}' is set up" \
       || (echo "❌ notary profile '{{notary_profile}}' not found — run: just notary-setup"; exit 1)
 
+# ---- versioning -------------------------------------------------------------
+# Two independent numbers, edited only here so the hand-maintained pbxproj keeps
+# its readable formatting (we avoid `agvtool`, which would rewrite the file):
+#
+#   CURRENT_PROJECT_VERSION  (build number)  — auto-bumped on every `build`.
+#   MARKETING_VERSION        (e.g. 0.1.0)    — changed deliberately via release
+#                                              flow or `just set-version X.Y.Z`.
+
+# Print the current marketing + build numbers.
+version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mv=$(grep -m1 'MARKETING_VERSION'       "{{pbxproj}}" | sed -E 's/.*= ([^;]+);.*/\1/')
+    bn=$(grep -m1 'CURRENT_PROJECT_VERSION' "{{pbxproj}}" | sed -E 's/.*= ([0-9]+);.*/\1/')
+    echo "marketing: $mv"
+    echo "build:     $bn"
+
+# Bump the build number (+1, all configs); runs as part of `build`.
+bump-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cur=$(grep -oE 'CURRENT_PROJECT_VERSION = [0-9]+;' "{{pbxproj}}" \
+            | grep -oE '[0-9]+' | sort -n | tail -1)
+    next=$(( cur + 1 ))
+    sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = ${next};/g" "{{pbxproj}}"
+    echo "==> build number ${cur} → ${next}"
+
+# Set the marketing version (e.g. `just set-version 0.2.0`). Deliberate action.
+set-version VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! [[ "{{VERSION}}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+      echo "error: '{{VERSION}}' is not a MAJOR.MINOR.PATCH version" >&2
+      exit 1
+    fi
+    sed -i '' -E "s/MARKETING_VERSION = [^;]+;/MARKETING_VERSION = {{VERSION}};/g" "{{pbxproj}}"
+    echo "==> marketing version → {{VERSION}}"
+
 # ---- build pipeline ---------------------------------------------------------
 
 # Remove all build artifacts.
 clean:
     rm -rf build
 
-# Build host app + embedded extension via xcodebuild (default: Release).
-# Signing is intentionally disabled here — `just sign` applies the
-# Developer ID signature + entitlements afterward (the "outside Xcode" flow).
-build:
+# Signing is intentionally disabled here — `just sign` applies the Developer ID
+# signature + entitlements afterward (the "outside Xcode" flow). `bump-build`
+# runs first, so every build carries a fresh, never-reused build number.
+#
+# Build the unsigned host app + extension (auto-bumps the build number).
+build: bump-build
     DEVELOPER_DIR={{xcode_dev}} \
       xcodebuild -project QLTextView.xcodeproj \
                  -target QLTextView \
                  -configuration {{config}} \
                  CODE_SIGN_IDENTITY="" \
+                 CODE_SIGN_ENTITLEMENTS="" \
                  CODE_SIGN_STYLE=Manual \
                  CODE_SIGNING_REQUIRED=NO \
                  CODE_SIGNING_ALLOWED=NO \
@@ -127,24 +170,115 @@ notarize: _require-profile
     rm -f "$ZIP"
     echo "✅ Notarized + stapled {{app}}"
 
-# Full distributable pipeline: clean → build → sign → notarize → zip.
-release: clean build sign notarize
+# Repeatable and side-effect-free w.r.t. git/versioning — run it as often as you
+# like to produce a notarized zip for testing on another machine ("trial
+# release"). The zip is named with marketing + build numbers so successive
+# trials of the same version are distinguishable. Does NOT tag or release.
+#
+# Build a notarized distributable zip (clean → build → sign → notarize → zip).
+dist: clean build sign notarize
     #!/usr/bin/env bash
     set -euo pipefail
-    OUT="build/QLTextView-$(date +%Y%m%d).zip"
-    ditto -c -k --keepParent "{{app}}" "$OUT"
-    echo "✅ Release ready: $OUT"
+    mv=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "{{app}}/Contents/Info.plist")
+    bn=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion"             "{{app}}/Contents/Info.plist")
+    out="build/QLTextView-${mv}-${bn}.zip"
+    ditto -c -k --keepParent "{{app}}" "$out"
+    echo "✅ Distribution ready: $out  (v${mv}, build ${bn})"
 
+# Steps: (1) require clean tree + unused tag; (2) dist (bumps build number);
+# (3) archive zip into releases/; (4) commit the bump + annotated tag v<version>;
+# (5) post-bump the patch version and commit "start <next> development".
+# For a minor/major bump, run `just set-version X.Y.0` and commit first.
+#
+# Finalize an official release of the current marketing version.
+release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # 1a. clean working tree
+    if [[ -n "$(git status --porcelain)" ]]; then
+      echo "error: working tree not clean — commit or stash before releasing." >&2
+      git status --short >&2
+      exit 1
+    fi
+    # 1b. the version we're about to ship, and a tag-collision guard (fail
+    #     before the slow notarize step, not after).
+    version=$(grep -m1 'MARKETING_VERSION' "{{pbxproj}}" | sed -E 's/.*= ([^;]+);.*/\1/')
+    tag="v${version}"
+    if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+      echo "error: tag ${tag} already exists — bump with: just set-version X.Y.Z" >&2
+      exit 1
+    fi
+    echo "==> Releasing ${tag}"
+
+    # 2. produce the notarized distributable (bumps the build number)
+    just dist
+
+    # 3. authoritative version/build come from the built bundle
+    mv=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "{{app}}/Contents/Info.plist")
+    bn=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion"             "{{app}}/Contents/Info.plist")
+    mkdir -p "{{releases_dir}}"
+    cp "build/QLTextView-${mv}-${bn}.zip" "{{releases_dir}}/"
+    echo "==> Archived {{releases_dir}}/QLTextView-${mv}-${bn}.zip"
+
+    # 4. release commit (captures the build-number bump) + annotated tag
+    git add -A
+    git commit -m "Release ${tag} (build ${bn})"
+    git tag -a "${tag}" -m "QLTextView ${mv} (build ${bn})"
+
+    # 5. post-bump the patch version for ongoing development
+    IFS=. read -r maj min pat <<< "${mv}"
+    next="${maj}.${min}.$(( pat + 1 ))"
+    just set-version "${next}"
+    git add -A
+    git commit -m "Start ${next} development"
+
+    echo "✅ Released ${tag} (build ${bn}); now on ${next}-dev"
+    echo "   Publish with:  git push && git push origin ${tag}"
+
+# Also repairs Launch Services: a Quick Look extension is keyed by bundle ID,
+# and stray copies (build/, worktrees) can win the registration over the
+# installed app — silently breaking previews. We deregister every copy that
+# isn't /Applications, then force-register the installed one.
+#
 # Install the signed build to /Applications and refresh Quick Look.
 install:
     #!/usr/bin/env bash
     set -euo pipefail
     [[ -d "{{app}}" ]] || { echo "no build — run: just build sign" >&2; exit 1; }
-    rm -rf /Applications/QLTextView.app
+    lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    canonical="/Applications/QLTextView.app"
+
+    rm -rf "$canonical"
     cp -R "{{app}}" /Applications/
+
+    echo "==> Deregistering stray copies of the bundle"
+    strays=$("$lsreg" -dump 2>/dev/null \
+      | grep -oE '/[^"]*QLTextView\.app' \
+      | sort -u \
+      | grep -vx "$canonical" || true)
+    if [[ -n "$strays" ]]; then
+      while IFS= read -r stray; do
+        echo "    - $stray"
+        "$lsreg" -u "$stray" 2>/dev/null || true
+      done <<< "$strays"
+    else
+      echo "    (none)"
+    fi
+
+    echo "==> Registering $canonical"
+    "$lsreg" -f "$canonical"
+
+    # Reinstalling resets the extension to disabled; re-enable it so Quick Look
+    # is actually allowed to use it (otherwise files fall back to a generic panel).
+    echo "==> Enabling the Quick Look extension"
+    pluginkit -e use -i com.qltextview.app.QLTextViewExtension 2>/dev/null || true
+
+    echo "==> Refreshing Quick Look"
     qlmanage -r       >/dev/null 2>&1 || true
     qlmanage -r cache >/dev/null 2>&1 || true
-    echo "✅ Installed to /Applications/QLTextView.app"
+
+    echo "✅ Installed to $canonical"
     echo "Enable: System Settings → General → Login Items & Extensions → Quick Look → toggle QLTextView on"
     open /Applications/QLTextView.app
 

@@ -12,13 +12,66 @@
     <string>$(PRODUCT_NAME)</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1</string>
+    <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026. All rights reserved.</string>
+    <!--
+      Filename-extension → UTI bindings for text-like file types that have
+      no system or third-party owner. Each binds to a UTI that conforms to
+      public.plain-text, which the Quick Look extension already declares in
+      QLSupportedContentTypes. Without this, files of these types resolve to
+      dynamic UTIs (dyn.*) — and despite their conformance tree including
+      public.data, the modern Quick Look extension router does NOT route them
+      to extensions that only declare public.data.
+
+      System-bound extensions (e.g. .json → public.json, .ts → MPEG-2 TS,
+      .yaml → public.yaml) cannot be overridden from here; those are matched
+      directly in the extension's QLSupportedContentTypes.
+    -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.qltextview.app.previewable-text</string>
+            <key>UTTypeDescription</key>
+            <string>QLTextView Previewable Text</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.plain-text</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>jq</string>
+                    <string>jsonl</string>
+                    <string>toml</string>
+                    <string>conf</string>
+                    <string>cfg</string>
+                    <string>env</string>
+                    <string>properties</string>
+                    <string>tf</string>
+                    <string>tfvars</string>
+                    <!--
+                      .ts is system-bound to public.mpeg-2-transport-stream
+                      (video). Built-in macOS handlers beat our extension when
+                      both declare that type. We override the binding here so
+                      .ts resolves to our text UTI instead — same pattern as
+                      .jq and .jsonl above.
+                    -->
+                    <string>ts</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

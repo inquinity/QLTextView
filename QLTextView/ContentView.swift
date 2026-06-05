@@ -9,11 +9,28 @@
 
 import SwiftUI
 
+/// The marketing version (CFBundleShortVersionString), read from Bundle so
+/// the page always matches the build settings. Falls back to "unknown" if
+/// the key is missing or empty.
+private let appVersionLabel: String = {
+    let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    return (v?.isEmpty == false) ? v! : "unknown"
+}()
+
 struct ContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("QLTextView")
-                .font(.largeTitle).bold()
+            HStack(alignment: .firstTextBaseline) {
+                Text("QLTextView")
+                    .font(.largeTitle).bold()
+                Spacer()
+                Text("v\(appVersionLabel)")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Version \(appVersionLabel)")
+            }
             Text("A modern Quick Look text previewer. Phase 1 build — fixed allowlist, plain monospaced rendering.")
                 .foregroundStyle(.secondary)
 

@@ -15,9 +15,9 @@
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1</string>
+    <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionPointIdentifier</key>
@@ -42,6 +42,12 @@
                 <string>public.xml</string>
                 <string>public.json</string>
                 <string>public.yaml</string>
+                <!--
+                  .ts is system-bound to this MPEG-2 transport-stream (video)
+                  type, so the file is routed here only if we declare it
+                  explicitly. The byte-sniff still rejects genuine video.
+                -->
+                <string>public.mpeg-2-transport-stream</string>
                 <string>public.data</string>
             </array>
             <key>QLSupportsSearchableItems</key>

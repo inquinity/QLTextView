@@ -23,8 +23,8 @@ enum TextDetection {
     /// user-editable shared config. Kept intentionally small but
     /// representative of the qlstephen use case.
     static let defaultExtensions: Set<String> = [
-        "yaml", "yml", "toml", "jq", "ini", "conf", "cfg", "env",
-        "properties", "lock", "log", "csv", "tsv", "tf", "tfvars",
+        "yaml", "yml", "toml", "json", "jsonl", "jq", "ini", "conf", "cfg", "env",
+        "ts", "properties", "lock", "log", "csv", "tsv", "tf", "tfvars",
         "dockerignore", "gitignore", "gitattributes", "editorconfig"
     ]
 
