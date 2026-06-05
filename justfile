@@ -170,13 +170,39 @@ notarize: _require-profile
     rm -f "$ZIP"
     echo "✅ Notarized + stapled {{app}}"
 
+# Verify that the extension list in ContentView.swift matches the one in
+# TextDetection.swift. Run automatically by `dist` — catches drift before
+# the expensive build/sign/notarize steps.
+check-extensions:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    td="QLTextViewExtension/TextDetection.swift"
+    cv="QLTextView/ContentView.swift"
+    # macOS system awk does not support \s; use POSIX [[:space:]] instead.
+    # td: range ends on the line that is nothing but whitespace + "]"
+    # cv: range ends on "].sorted()" (the only ] followed immediately by .sorted)
+    td_exts=$(awk '/static let defaultExtensions/,/^[[:space:]]*\]$/' "$td" \
+                | grep -oE '"[a-z][^"]*"' | tr -d '"' | sort)
+    cv_exts=$(awk '/private let supportedExtensions/,/\]\.sorted/' "$cv" \
+                | grep -oE '"[a-z][^"]*"' | tr -d '"' | sort)
+    if [[ "$td_exts" != "$cv_exts" ]]; then
+      echo "error: extension lists are out of sync" >&2
+      echo "  in TextDetection but missing from ContentView:" >&2
+      comm -23 <(echo "$td_exts") <(echo "$cv_exts") | sed 's/^/    /' >&2
+      echo "  in ContentView but missing from TextDetection:" >&2
+      comm -13 <(echo "$td_exts") <(echo "$cv_exts") | sed 's/^/    /' >&2
+      echo "Update both files then re-run." >&2
+      exit 1
+    fi
+    echo "✅ Extension lists in sync ($(echo "$td_exts" | wc -l | tr -d ' ') extensions)"
+
 # Repeatable and side-effect-free w.r.t. git/versioning — run it as often as you
 # like to produce a notarized zip for testing on another machine ("trial
 # release"). The zip is named with marketing + build numbers so successive
 # trials of the same version are distinguishable. Does NOT tag or release.
 #
 # Build a notarized distributable zip (clean → build → sign → notarize → zip).
-dist: clean build sign notarize
+dist: check-extensions clean build sign notarize
     #!/usr/bin/env bash
     set -euo pipefail
     mv=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "{{app}}/Contents/Info.plist")

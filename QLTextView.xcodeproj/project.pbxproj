@@ -263,7 +263,7 @@
 				CODE_SIGN_ENTITLEMENTS = QLTextView/QLTextView.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = QLTextView/Info.plist;
@@ -282,7 +282,7 @@
 				CODE_SIGN_ENTITLEMENTS = QLTextView/QLTextView.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = QLTextView/Info.plist;
@@ -299,7 +299,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = QLTextViewExtension/QLTextViewExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = QLTextViewExtension/Info.plist;
@@ -317,7 +317,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = QLTextViewExtension/QLTextViewExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = QLTextViewExtension/Info.plist;
